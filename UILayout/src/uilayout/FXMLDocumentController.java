@@ -45,11 +45,11 @@ public class FXMLDocumentController implements Initializable {
     @FXML
     private Button btnExit;
     @FXML
-    private ListView<String> pkgProduct;
+    private ListView<?> pkgProduct;
     @FXML
     private Button btnAdd;
     @FXML
-    private ListView<String> allProduct;
+    private ListView<?> allProduct;
     @FXML
     private Button btnBack;
     @FXML
@@ -71,12 +71,10 @@ public class FXMLDocumentController implements Initializable {
     @FXML
     private ComboBox cboPkgId;
     
-   // private Connection conn;
-    //private Statement stmt;
-    //private ResultSet rs;
+    private Connection conn;
+    private Statement stmt;
+    private ResultSet rs;
     private ArrayList<Package> listPackages;
-    private ArrayList<ProductSupplier> listPkgProducts;
-    private ArrayList<ProductSupplier> listAllProducts;
     
     
     private void handleButtonAction(ActionEvent event) {
@@ -88,8 +86,9 @@ public class FXMLDocumentController implements Initializable {
         // TODO
         try {
             cboPkgId.getItems().clear();
-            cboPkgId.setItems(PackageDB.getPkgIds());
-            listPackages = PackageDB.loadPackages();                 
+            cboPkgId.setItems(getPkgIds());
+            listPackages = loadPackages();
+            
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -102,9 +101,64 @@ public class FXMLDocumentController implements Initializable {
         System.exit(0);
     }
 
+    private ArrayList<Package> loadPackages() {
+        ArrayList<Package> packages = new ArrayList<Package>();
+        try {
+            connectDB();
+            PreparedStatement stmt2 = conn.prepareStatement("SELECT * FROM PACKAGES");
+            ResultSet rs2 = stmt2.executeQuery();
+            while (rs2.next())
+            {
+                Package pkg = new Package();
+                pkg.setPackageId(rs2.getString("PackageId"));
+                pkg.setPkgName(rs2.getString("PkgName"));
+                pkg.setPkgStartDate(rs2.getString("PkgStartDate"));
+                pkg.setPkgEndDate(rs2.getString("PkgEndDate"));
+                pkg.setPkgDesc(rs2.getString("PkgDesc"));
+                pkg.setPkgBasePrice(rs2.getString("PkgBasePrice"));
+                pkg.setPkgAgencyCommission(rs2.getString("PkgAgencyCommission"));
+                packages.add(pkg);
+                
+            }
+            conn.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return packages;
+    }
+    
+    private void connectDB() {
+		try {
+			Class.forName("com.mysql.jdbc.Driver");
+			conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/travelexperts", "root", "");
+			stmt = conn.createStatement();
+		} catch (ClassNotFoundException e){
+			e.printStackTrace();
+		} catch (SQLException e){
+			e.printStackTrace();
+		}
+    }
+
+    private ObservableList<String> getPkgIds() {
+        List<String> list = new ArrayList<String>();
+        try {
+            connectDB();
+            rs = stmt.executeQuery("SELECT PACKAGEID FROM PACKAGES");
+            while (rs.next())
+            {
+                list.add(rs.getString("PackageId"));
+            }
+            conn.close();
+            
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        ObservableList<String> packages = FXCollections.observableList(list);
+        return packages; 
+    }
 
     @FXML
-    private void selectPkgId(ActionEvent event) throws ClassNotFoundException {
+    private void selectPkgId(ActionEvent event) {
         String selectedID = (String) cboPkgId.getValue();
         for (Package pkg : listPackages)
         {
@@ -127,31 +181,6 @@ public class FXMLDocumentController implements Initializable {
                 Double commission = Double.parseDouble(pkg.getPkgAgencyCommission());
                 basePrice.setText(nf.format(price)); 
                 agtCommission.setText(nf.format(commission));
-                
-                // Load first list box based on which products associated with package
-                listPkgProducts = ProductSupplierDB.loadPkgProducts(pkg.getPackageId());
-                List<String> list = new ArrayList<String>(); // temp list for loading into the listview box
-                for (ProductSupplier prodSup : listPkgProducts)
-                {
-                    list.add(prodSup.getProdName() + " " + prodSup.getSupName());
-                }
-                ObservableList<String> pkgProducts = FXCollections.observableList(list);
-                pkgProduct.setItems(pkgProducts);
-                
-                // Adds all the products except for the ones associated with package (DOES NOT WORK CURRENTLY)
-                listAllProducts = ProductSupplierDB.getAllProducts();
-                List<String> allProductsList = new ArrayList<String>(); // temp list for loading into the listview box
-                for (ProductSupplier prodSup : listAllProducts)
-                {
-                    if (listPkgProducts.contains(prodSup))
-                    {
-                        allProductsList.add(prodSup.getProdName() + " " + prodSup.getSupName());
-                    }
-                }
-                ObservableList<String> allProducts = FXCollections.observableList(allProductsList);
-                allProduct.setItems(allProducts);
-                
-                
             }
         }
     }
